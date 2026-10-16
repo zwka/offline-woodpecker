@@ -1,0 +1,25 @@
+{
+  "name": "offline-woodpecker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:generator": "npm --workspace @offline-woodpecker/generator run dev",
+    "dev:trainer": "npm --workspace @offline-woodpecker/trainer run dev",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test --workspaces --if-present",
+    "build:index": "node tools/build-puzzle-index.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}

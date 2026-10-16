@@ -11,3 +11,10 @@ Use the canonical labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready
 ### Domain docs
 
 Use a single-context root `GLOSSARY.md` and `docs/adr/` layout. See `docs/agents/domain.md`.
+
+### Project entry points
+
+- Read `README.md` when changing local development, full-index generation, production preview, or Android tunnel setup.
+- Read `GLOSSARY.md` before naming Puzzle Sets, Runs, Puzzle Results, or scoring states.
+- Read the relevant file in `docs/adr/` before changing the browser-first runtime, Puzzle Set handoff, or source-index boundary.
+- Read `THIRD_PARTY_NOTICES.md` before changing chessboard artwork or source-data attribution.

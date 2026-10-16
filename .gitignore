@@ -1,0 +1,20 @@
+.DS_Store
+node_modules/
+dist/
+.vite/
+coverage/
+
+# The 293 MB Lichess export is a local build input and exceeds GitHub's
+# regular-file limit. Keep the small checked-in sample index instead.
+puzzles-database/*.zst
+
+# Generated source indexes are release inputs, not source files. The small
+# sample index remains checked in for local development.
+apps/generator/public/puzzle-index.generated.jsonl
+apps/generator/public/puzzle-index.generated-manifest.json
+apps/generator/public/puzzle-index.generated.jsonl.gz
+
+# Local browser data and test artifacts.
+.local-data/
+playwright-report/
+test-results/

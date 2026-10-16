@@ -1,0 +1,24 @@
+{
+  "name": "@offline-woodpecker/trainer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 4174",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4174",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@offline-woodpecker/domain": "0.1.0",
+    "chess.js": "^1.4.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-chessboard": "^5.12.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "kind": "puzzle-index-manifest",
+  "schemaVersion": 1,
+  "recordCount": 12,
+  "ratingMin": 1084,
+  "ratingMax": 2873,
+  "themes": [
+    "advantage",
+    "crushing",
+    "endgame",
+    "fork",
+    "hangingPiece",
+    "long",
+    "mate",
+    "mateIn1",
+    "mateIn2",
+    "middlegame",
+    "oneMove",
+    "operaMate",
+    "pawnEndgame",
+    "rookEndgame",
+    "short"
+  ],
+  "source": {
+    "name": "Lichess Puzzle Database",
+    "url": "https://database.lichess.org/",
+    "snapshot": "2026-10-05",
+    "license": "CC0"
+  }
+}
