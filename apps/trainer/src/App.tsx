@@ -10,6 +10,7 @@ import {
   CircleHelp,
   DatabaseBackup,
   Download,
+  Eye,
   ExternalLink,
   FileUp,
   History,
@@ -31,6 +32,7 @@ import {
   nextAfterPuzzle,
   normalizePuzzleSet,
   parsePuzzleSet,
+  revealPuzzleSolution,
   retryPuzzle,
   scoreRun,
   type ActiveRun,
@@ -51,7 +53,7 @@ import {
   type StoredPuzzleSet,
   type TrainerData,
 } from "./storage";
-import { attemptMove, gameAtMoveIndex, isSquare, promotionForDrop, puzzlePosition } from "./puzzle-session";
+import { attemptMove, gameAtMoveIndex, isSquare, promotionForDrop, puzzlePosition, solutionLine } from "./puzzle-session";
 
 type ThemeChoice = "system" | "light" | "dark";
 type View = "library" | "solve" | "summary" | "history";
@@ -181,7 +183,7 @@ function resultLabel(result: PuzzleResult): { label: string; tone: string } {
   if (result.status === "pending") return { label: "Not reached", tone: "muted" };
   if (result.completion === "completed") return { label: "Completed after error", tone: "warm" };
   if (result.completion === "skipped") return { label: "Skipped", tone: "bad" };
-  return { label: "Error recorded", tone: "bad" };
+  return { label: "Failure", tone: "bad" };
 }
 
 function App() {
@@ -195,6 +197,7 @@ function App() {
   const [startingSetId, setStartingSetId] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string; piece: string } | null>(null);
+  const solutionLineRef = useRef<HTMLParagraphElement>(null);
   const setInputRef = useRef<HTMLInputElement>(null);
   const backupInputRef = useRef<HTMLInputElement>(null);
 
@@ -230,6 +233,10 @@ function App() {
   const historyRun = data?.runs.find((run) => run.id === historyRunId);
   const historySet = historyRun ? data?.sets.find((record) => record.set.id === historyRun.setId)?.set : undefined;
   const visibleSets = data?.sets.filter((record) => !record.archived) ?? [];
+
+  useEffect(() => {
+    if (activeRun?.currentPuzzle.kind === "solution-revealed") solutionLineRef.current?.focus();
+  }, [activeRun?.currentPuzzle, selectedRunId, view]);
 
   useEffect(() => {
     setSelectedSquare(null);
@@ -374,8 +381,15 @@ function App() {
   }
 
   function handleRetry() {
-    if (isPersisting || !activeRun || activeRun.currentPuzzle.kind !== "error") return;
+    if (isPersisting || !activeRun || (activeRun.currentPuzzle.kind !== "error" && activeRun.currentPuzzle.kind !== "solution-revealed")) return;
     void updateRun(retryPuzzle(activeRun));
+  }
+
+  function handleShowSolution() {
+    if (isPersisting || !activeRun || (activeRun.currentPuzzle.kind !== "playing" && activeRun.currentPuzzle.kind !== "error")) return;
+    void updateRun(revealPuzzleSolution(activeRun));
+    setSelectedSquare(null);
+    setPendingPromotion(null);
   }
 
   function choosePromotion(choice: PromotionChoice) {
@@ -450,8 +464,9 @@ function App() {
     const position = puzzlePosition(puzzle, state);
     const score = scoreRun(activeRun);
     const isError = state.kind === "error";
+    const isSolutionRevealed = state.kind === "solution-revealed";
     const isCompletedAfterError = state.kind === "completed-after-error";
-    const interactionLocked = isError || isCompletedAfterError;
+    const interactionLocked = isError || isSolutionRevealed || isCompletedAfterError;
 
     const boardOptions: ChessboardOptions = {
       position: position.fen,
@@ -480,14 +495,23 @@ function App() {
             <div className="board-frame"><Chessboard options={boardOptions} />{pendingPromotion && <div className="promotion-picker"><span>Choose promotion</span><div>{PROMOTION_CHOICES.map((choice) => <button type="button" key={choice.value} onClick={() => choosePromotion(choice.value)}>{choice.label}</button>)}</div></div>}</div>
             <div className="board-caption"><span><span className="turn-dot" /> {position.orientation === "white" ? "White" : "Black"} to solve</span><span>{puzzle.id}</span></div>
           </section>
-          <aside className={`solve-panel ${isError ? "error-state" : isCompletedAfterError ? "recovered-state" : ""}`}>
+          <aside className={`solve-panel ${isError || isSolutionRevealed ? "error-state" : isCompletedAfterError ? "recovered-state" : ""}`}>
             {isError ? (
               <>
                 <div className="state-icon error-icon"><RefreshCw size={22} /></div>
                 <p className="eyebrow">First try missed</p>
                 <h2>Reset and look again.</h2>
                 <p className="solve-copy">The score is recorded as a failure. You can retry this position as many times as needed.</p>
-                <div className="solve-panel-actions"><button className="primary-button" type="button" onClick={handleRetry}><RotateCcw size={17} /> Retry puzzle</button><button className="secondary-button" type="button" onClick={handleNextAfterError}><SkipForward size={17} /> Next puzzle</button></div>
+                <div className="solve-panel-actions"><button className="secondary-button" type="button" onClick={handleShowSolution} disabled={isPersisting}><Eye size={17} /> Show solution</button><button className="primary-button" type="button" onClick={handleRetry} disabled={isPersisting}><RotateCcw size={17} /> Retry puzzle</button><button className="secondary-button" type="button" onClick={handleNextAfterError} disabled={isPersisting}><SkipForward size={17} /> Next puzzle</button></div>
+              </>
+            ) : isSolutionRevealed ? (
+              <>
+                <div className="state-icon solution-icon"><Eye size={22} /></div>
+                <p className="eyebrow">Solution revealed</p>
+                <h2>{puzzle.themes.includes("mateIn1") ? "One solution" : "Solution"}</h2>
+                <p className="solve-copy">This Puzzle Result is recorded as a failure.</p>
+                <p ref={solutionLineRef} className="solution-line" tabIndex={-1} aria-live="polite" aria-atomic="true">{solutionLine(puzzle, state.moveIndex)}</p>
+                <div className="solve-panel-actions"><button className="primary-button" type="button" onClick={handleRetry} disabled={isPersisting}><RotateCcw size={17} /> Retry puzzle</button><button className="secondary-button" type="button" onClick={handleNextAfterError} disabled={isPersisting}><SkipForward size={17} /> Next puzzle</button></div>
               </>
             ) : isCompletedAfterError ? (
               <>
@@ -505,6 +529,7 @@ function App() {
                 <p className="solve-copy">Play the tactical idea. The opponent will answer automatically when your move is correct.</p>
                 <div className="solve-meta"><span>First-try score</span><strong>{score.firstTrySolved} / {score.total}</strong></div>
                 <div className="solve-tip"><CircleHelp size={16} /><span>Rating and themes stay hidden until this Puzzle is complete.</span></div>
+                <div className="solve-panel-actions"><button className="secondary-button" type="button" onClick={handleShowSolution} disabled={isPersisting}><Eye size={17} /> Show solution</button></div>
               </>
             )}
             <div className="puzzle-source-link"><span>Source puzzle</span><a href={puzzle.gameUrl} target="_blank" rel="noreferrer">View record <ExternalLink size={13} /></a></div>
@@ -524,7 +549,7 @@ function App() {
         <div className="summary-header"><button className="back-button" type="button" onClick={() => setView("library")}><ArrowLeft size={17} /> Library</button><span className="summary-date">Completed {formatDate(run.endedAt)}</span></div>
         <section className="summary-hero">
           <div className="score-ring" style={{ background: `conic-gradient(var(--accent) ${score.percentage * 3.6}deg, var(--line) 0)` }}><div><strong>{score.percentage}%</strong><span>first-try score</span></div></div>
-          <div className="summary-copy"><p className="eyebrow">Run complete</p><h1>{set.name}</h1><p>You finished all {score.total} puzzles. The score counts only solutions found before the first error.</p><div className="summary-actions"><button className="primary-button" type="button" onClick={() => void startRun(set)}><Play size={17} /> Start another Run</button><button className="secondary-button" type="button" onClick={() => { setHistoryRunId(run.id); setView("history"); }}><History size={16} /> Inspect results</button></div></div>
+          <div className="summary-copy"><p className="eyebrow">Run complete</p><h1>{set.name}</h1><p>You finished all {score.total} puzzles. The score counts only solutions found before a wrong move or solution reveal.</p><div className="summary-actions"><button className="primary-button" type="button" onClick={() => void startRun(set)}><Play size={17} /> Start another Run</button><button className="secondary-button" type="button" onClick={() => { setHistoryRunId(run.id); setView("history"); }}><History size={16} /> Inspect results</button></div></div>
         </section>
         <div className="summary-metrics"><div><span>First-try solves</span><strong>{score.firstTrySolved}</strong></div><div><span>Completed after error</span><strong>{score.eventuallyCompleted}</strong></div><div><span>Skipped</span><strong>{score.notCompleted}</strong></div><div><span>Run duration</span><strong>{Math.max(1, Math.round((new Date(run.endedAt).getTime() - new Date(run.startedAt).getTime()) / 60000))} min</strong></div></div>
       </main>

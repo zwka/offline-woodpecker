@@ -68,7 +68,7 @@ export function createRun(set: PuzzleSet, timestamp = nowIso()): ActiveRun {
 
   return {
     kind: "run",
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: runId(),
     setId: set.id,
     status: "active",
@@ -117,9 +117,42 @@ export function markPuzzleError(
   };
 }
 
+export function revealPuzzleSolution(run: ActiveRun, timestamp = nowIso()): ActiveRun {
+  if (run.currentPuzzle.kind !== "playing" && run.currentPuzzle.kind !== "error") {
+    throw new Error("A solution can only be revealed before a Puzzle is completed");
+  }
+
+  const current = resultAt(run, run.currentPuzzleIndex);
+  let nextResult: PuzzleResult;
+  if (current.status === "pending") {
+    nextResult = {
+      puzzleId: current.puzzleId,
+      status: "failed",
+      completion: "pending",
+      errorCount: current.errorCount,
+      retryCount: current.retryCount,
+    };
+  } else if (current.status === "failed" && current.completion === "pending") {
+    nextResult = current;
+  } else {
+    throw new Error("A solution can only be revealed for an unfinished Puzzle Result");
+  }
+
+  return {
+    ...run,
+    currentPuzzle: {
+      kind: "solution-revealed",
+      moveIndex: run.currentPuzzle.moveIndex,
+      retryCount: run.currentPuzzle.retryCount,
+    },
+    results: replaceResult(run, run.currentPuzzleIndex, nextResult),
+    updatedAt: timestamp,
+  };
+}
+
 export function retryPuzzle(run: ActiveRun, timestamp = nowIso()): ActiveRun {
-  if (run.currentPuzzle.kind !== "error") {
-    throw new Error("Retry is only available after a Puzzle error");
+  if (run.currentPuzzle.kind !== "error" && run.currentPuzzle.kind !== "solution-revealed") {
+    throw new Error("Retry is only available after a Puzzle failure");
   }
 
   const current = resultAt(run, run.currentPuzzleIndex);
@@ -204,7 +237,7 @@ export function completePuzzle(run: ActiveRun, timestamp = nowIso()): Run {
 }
 
 export function nextAfterPuzzle(run: ActiveRun, timestamp = nowIso()): Run {
-  if (run.currentPuzzle.kind !== "error" && run.currentPuzzle.kind !== "completed-after-error") {
+  if (run.currentPuzzle.kind !== "error" && run.currentPuzzle.kind !== "solution-revealed" && run.currentPuzzle.kind !== "completed-after-error") {
     throw new Error("Next is only available after a Puzzle error");
   }
 

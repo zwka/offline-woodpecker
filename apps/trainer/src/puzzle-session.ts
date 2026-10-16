@@ -23,10 +23,10 @@ function parseUci(value: string): { from: Square; to: Square; promotion?: PieceS
   return { from: fromValue, to: toValue, promotion: promotionValue };
 }
 
-function applyUci(game: Chess, uci: string): void {
+function applyUci(game: Chess, uci: string) {
   const move = parseUci(uci);
   if (!move) throw new Error(`Invalid UCI move: ${uci}`);
-  game.move(move);
+  return game.move(move);
 }
 
 export function gameAtMoveIndex(puzzle: Puzzle, moveIndex: number): Chess {
@@ -37,6 +37,27 @@ export function gameAtMoveIndex(puzzle: Puzzle, moveIndex: number): Chess {
     applyUci(game, move);
   }
   return game;
+}
+
+export function solutionLine(puzzle: Puzzle, moveIndex: number): string {
+  const game = gameAtMoveIndex(puzzle, moveIndex);
+  const notation: string[] = [];
+
+  for (let index = moveIndex; index < puzzle.moves.length; index += 1) {
+    const uci = puzzle.moves[index];
+    if (!uci) throw new Error(`Puzzle ${puzzle.id} is missing move ${index}`);
+    const turn = game.turn();
+    const moveNumber = game.moveNumber();
+    const move = applyUci(game, uci);
+    const numberedMove = turn === "w"
+      ? `${moveNumber}. ${move.san}`
+      : index === moveIndex
+        ? `${moveNumber}... ${move.san}`
+        : move.san;
+    notation.push(numberedMove);
+  }
+
+  return notation.join(" ");
 }
 
 export function validatePuzzleSet(set: PuzzleSet): void {

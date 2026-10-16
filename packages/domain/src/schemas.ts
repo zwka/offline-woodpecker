@@ -84,27 +84,46 @@ export const puzzleResultSchema = z.discriminatedUnion("status", [
   }),
 ]);
 
+const playingPuzzleStateSchema = z.object({
+  kind: z.literal("playing"),
+  moveIndex: z.number().int().min(1),
+  retryCount: z.number().int().nonnegative(),
+});
+
+const errorPuzzleStateSchema = z.object({
+  kind: z.literal("error"),
+  moveIndex: z.number().int().min(1),
+  retryCount: z.number().int().nonnegative(),
+  reason: z.enum(["incorrect", "illegal"]),
+});
+
+const solutionRevealedPuzzleStateSchema = z.object({
+  kind: z.literal("solution-revealed"),
+  moveIndex: z.number().int().min(1),
+  retryCount: z.number().int().nonnegative(),
+});
+
+const completedAfterErrorPuzzleStateSchema = z.object({
+  kind: z.literal("completed-after-error"),
+  retryCount: z.number().int().positive(),
+});
+
+const activePuzzleStateV1Schema = z.discriminatedUnion("kind", [
+  playingPuzzleStateSchema,
+  errorPuzzleStateSchema,
+  completedAfterErrorPuzzleStateSchema,
+]);
+
 export const activePuzzleStateSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("playing"),
-    moveIndex: z.number().int().min(1),
-    retryCount: z.number().int().nonnegative(),
-  }),
-  z.object({
-    kind: z.literal("error"),
-    moveIndex: z.number().int().min(1),
-    retryCount: z.number().int().nonnegative(),
-    reason: z.enum(["incorrect", "illegal"]),
-  }),
-  z.object({
-    kind: z.literal("completed-after-error"),
-    retryCount: z.number().int().positive(),
-  }),
+  playingPuzzleStateSchema,
+  errorPuzzleStateSchema,
+  solutionRevealedPuzzleStateSchema,
+  completedAfterErrorPuzzleStateSchema,
 ]);
 
 const runBaseSchema = z.object({
   kind: z.literal("run"),
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   id: z.string().min(1),
   setId: z.string().min(1),
   startedAt: z.string().datetime(),
@@ -112,7 +131,9 @@ const runBaseSchema = z.object({
   results: z.array(puzzleResultSchema).min(1),
 });
 
-export const runSchema = z.union([
+const runBaseV1Schema = runBaseSchema.extend({ schemaVersion: z.literal(1) });
+
+const currentRunSchema = z.union([
   runBaseSchema.extend({
     status: z.literal("active"),
     currentPuzzleIndex: z.number().int().nonnegative(),
@@ -125,6 +146,24 @@ export const runSchema = z.union([
     endedAt: z.string().datetime(),
   }),
 ]);
+
+const legacyRunSchema = z.union([
+  runBaseV1Schema.extend({
+    status: z.literal("active"),
+    currentPuzzleIndex: z.number().int().nonnegative(),
+    currentPuzzle: activePuzzleStateV1Schema,
+  }),
+  runBaseV1Schema.extend({
+    status: z.enum(["completed", "abandoned"]),
+    currentPuzzleIndex: z.null(),
+    currentPuzzle: z.null(),
+    endedAt: z.string().datetime(),
+  }),
+]);
+
+export const runSchema = z.union([currentRunSchema, legacyRunSchema]).transform((run) => (
+  run.schemaVersion === 2 ? run : currentRunSchema.parse({ ...run, schemaVersion: 2 })
+));
 
 const trainerBackupSetSchema = z.object({
   set: puzzleSetSchema,

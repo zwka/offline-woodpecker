@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { continuePuzzle, createRun, type Puzzle, type PuzzleSet } from "@offline-woodpecker/domain";
-import { attemptMove, gameAtMoveIndex, promotionForDrop, puzzlePosition } from "./puzzle-session";
+import { attemptMove, gameAtMoveIndex, promotionForDrop, puzzlePosition, solutionLine } from "./puzzle-session";
 
 const puzzle: Puzzle = {
   id: "0000H",
@@ -48,6 +48,35 @@ describe("puzzle session", () => {
 
     const run = createRun(set);
     expect(attemptMove(puzzle, run, "d5", "g2")).toEqual({ kind: "complete" });
+  });
+
+  it("accepts an alternate legal checkmate for a mate-in-one Puzzle", () => {
+    const alternateMatePuzzle: Puzzle = {
+      ...puzzle,
+      fen: "8/8/8/8/8/8/k1Q5/2K5 b - - 0 1",
+      moves: ["a2a1", "c2a4"],
+      themes: ["mateIn1"],
+    };
+    const alternateMateSet: PuzzleSet = {
+      ...set,
+      selection: { ...set.selection, count: 1 },
+      puzzles: [alternateMatePuzzle],
+    };
+
+    expect(attemptMove(alternateMatePuzzle, createRun(alternateMateSet), "c2", "b1")).toEqual({ kind: "complete" });
+  });
+
+  it("formats the remaining answer line as numbered SAN moves", () => {
+    const numberedPuzzle: Puzzle = {
+      ...puzzle,
+      fen: "8/8/8/8/8/8/8/K6k w - - 0 1",
+      moves: ["a1a2", "h1h2", "a2a3", "h2h3"],
+      themes: ["short"],
+    };
+
+    expect(solutionLine(numberedPuzzle, 1)).toBe("1... Kh2 2. Ka3 Kh3");
+    expect(solutionLine(numberedPuzzle, 3)).toBe("2... Kh3");
+    expect(solutionLine(puzzle, 1)).toBe("15... Qg2#");
   });
 
   it("rejects an incorrect legal attempt without changing the expected line", () => {

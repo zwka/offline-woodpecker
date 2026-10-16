@@ -151,10 +151,12 @@ h3 { margin-bottom: 8px; font-size: 19px; }
 .state-icon { display: grid; place-items: center; width: 47px; height: 47px; margin-bottom: 25px; border-radius: 50%; }
 .playing-icon { color: var(--accent-strong); background: var(--accent-wash); }
 .error-icon { color: var(--danger); background: var(--danger-wash); }
+.solution-icon { color: var(--warm); background: var(--warm-wash); }
 .recovered-icon { color: var(--good); background: color-mix(in srgb, var(--good) 17%, transparent); }
 .solve-panel h2 { margin-bottom: 12px; font-size: 30px; line-height: 1.05; }
 .solve-copy { margin-bottom: 25px; color: var(--muted); font-size: 13px; line-height: 1.65; }
 .solve-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.solution-line { margin: -8px 0 22px; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
 .solve-meta { display: flex; justify-content: space-between; gap: 20px; margin-top: 15px; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .solve-meta strong { color: var(--accent-strong); }
 .solve-tip { display: flex; gap: 8px; align-items: flex-start; margin-top: 17px; color: var(--muted); font-size: 11px; line-height: 1.5; }

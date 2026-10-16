@@ -4,10 +4,11 @@ import {
   createRun,
   markPuzzleError,
   nextAfterPuzzle,
+  revealPuzzleSolution,
   retryPuzzle,
   scoreRun,
 } from "./run";
-import type { PuzzleSet } from "./schemas";
+import { parseRun, parseTrainerBackup, type PuzzleSet } from "./schemas";
 
 const set: PuzzleSet = {
   kind: "puzzle-set",
@@ -92,6 +93,71 @@ describe("Run state", () => {
       if (next.status === "active") {
         expect(next.currentPuzzleIndex).toBe(1);
       }
+    }
+  });
+
+  it("records a revealed solution as a failure that can be resumed", () => {
+    const revealed = revealPuzzleSolution(createRun(set), "2026-01-01T00:01:00.000Z");
+
+    expect(revealed.currentPuzzle).toEqual({
+      kind: "solution-revealed",
+      moveIndex: 1,
+      retryCount: 0,
+    });
+    expect(revealed.results[0]).toMatchObject({
+      status: "failed",
+      completion: "pending",
+      errorCount: 0,
+      retryCount: 0,
+    });
+    expect(scoreRun(revealed).firstTrySolved).toBe(0);
+    expect(parseRun(revealed)).toEqual(revealed);
+  });
+
+  it("migrates schema-v1 Runs when loading Runs and backups", () => {
+    const legacyRun = { ...createRun(set), schemaVersion: 1 };
+    const restored = parseRun(legacyRun);
+    const backup = parseTrainerBackup({
+      kind: "trainer-backup",
+      schemaVersion: 2,
+      exportedAt: "2026-01-01T00:01:00.000Z",
+      puzzleSets: [],
+      runs: [legacyRun],
+    });
+
+    expect(restored.schemaVersion).toBe(2);
+    expect(backup.runs[0]?.schemaVersion).toBe(2);
+  });
+
+  it("reveals the solution after an incorrect move without adding another error", () => {
+    const errored = markPuzzleError(createRun(set), "incorrect");
+    const revealed = revealPuzzleSolution(errored);
+
+    expect(revealed.currentPuzzle.kind).toBe("solution-revealed");
+    expect(revealed.results[0]).toMatchObject({ status: "failed", errorCount: 1 });
+  });
+
+  it("allows a revealed failure to be retried and eventually completed", () => {
+    const revealed = revealPuzzleSolution(createRun(set));
+    const retried = retryPuzzle(revealed);
+    const completed = completePuzzle(retried);
+
+    expect(retried.currentPuzzle).toEqual({ kind: "playing", moveIndex: 1, retryCount: 1 });
+    expect(completed.status).toBe("active");
+    if (completed.status === "active") {
+      expect(completed.currentPuzzle).toEqual({ kind: "completed-after-error", retryCount: 1 });
+      expect(scoreRun(completed)).toMatchObject({ firstTrySolved: 0, eventuallyCompleted: 1 });
+    }
+  });
+
+  it("can advance after revealing while retaining a failed result", () => {
+    const revealed = revealPuzzleSolution(createRun(set));
+    const next = nextAfterPuzzle(revealed);
+
+    expect(next.status).toBe("active");
+    if (next.status === "active") {
+      expect(next.currentPuzzleIndex).toBe(1);
+      expect(next.results[0]).toMatchObject({ status: "failed", completion: "skipped" });
     }
   });
 });

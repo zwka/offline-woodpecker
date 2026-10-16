@@ -64,9 +64,11 @@ The preview server listens on `http://127.0.0.1:4174`. In a second terminal, sta
 cloudflared tunnel --url http://127.0.0.1:4174
 ```
 
-Copy the `https://<name>.trycloudflare.com` URL from the `cloudflared` output and open it in Android Chrome. Use Chrome's menu to install the Trainer or add it to the home screen.
+Open the `https://<name>.trycloudflare.com` URL in Android Chrome. Wait for the library to load while online. The service worker caches the app shell during this first visit. Then install the Trainer from Chrome's menu or add it to the home screen.
 
-Keep the preview server and `cloudflared` process running while you use the phone app. A Quick Tunnel is temporary and gets a new URL when it restarts. If port `4174` is busy, choose another preview port and pass the same port to `cloudflared`:
+After the first load, the service worker serves Trainer from the device cache. You can reopen it and solve locally stored Puzzle Sets without the preview server or tunnel. Trainer stores Puzzle Sets and Run history on the device.
+
+To fetch updates or open Trainer on another device, start the preview and tunnel. Then visit the current tunnel URL. A restarted Quick Tunnel gets a new URL and creates a new app origin with separate browser storage. Export a Trainer backup before switching origins. Restore it at the new URL. If port `4174` is busy, choose another preview port and pass the same port to `cloudflared`:
 
 ```bash
 npm --workspace @offline-woodpecker/trainer run preview -- --port 4184

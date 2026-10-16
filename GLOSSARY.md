@@ -36,11 +36,11 @@ The outcome of one Puzzle within a Run, including whether it was solved on the f
 _Avoid_: Puzzle score, answer
 
 **First-Try Solve**:
-A Puzzle Result in which the player completes the entire expected solution without making an incorrect or illegal player move.
+A Puzzle Result in which the player completes the entire expected solution without making an incorrect or illegal player move or revealing the solution.
 _Avoid_: First attempt, perfect solve
 
 **Failure**:
-A Puzzle Result whose first try included an incorrect or illegal player move. The Puzzle may still be completed later, but the Result does not earn the Run's point.
+A Puzzle Result whose first try included an incorrect or illegal player move, or ended when the player chose to reveal the solution. The Puzzle may still be completed later, but the Result does not earn the Run's point.
 _Avoid_: Loss, failed Run
 
 **Eventually Completed**:

@@ -17,6 +17,13 @@ async function cacheAppAssets(cache) {
   }));
 }
 
+async function cachedResponseFor(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  if (request.destination === "document") return caches.match("/");
+  return undefined;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -39,15 +46,13 @@ self.addEventListener("fetch", (event) => {
   event.respondWith((async () => {
     try {
       const response = await fetch(event.request);
-      if (response.ok) {
-        const copy = response.clone();
-        event.waitUntil(caches.open(CACHE).then((cache) => cache.put(event.request, copy)));
-      }
+      if (!response.ok) return (await cachedResponseFor(event.request)) ?? response;
+      const copy = response.clone();
+      event.waitUntil(caches.open(CACHE).then((cache) => cache.put(event.request, copy)));
       return response;
     } catch {
-      const cached = await caches.match(event.request);
+      const cached = await cachedResponseFor(event.request);
       if (cached) return cached;
-      if (event.request.destination === "document") return (await caches.match("/")) ?? new Response("Offline", { status: 503 });
       return new Response("Offline", { status: 503 });
     }
   })());
