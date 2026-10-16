@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
 import type { PieceSymbol } from "chess.js";
 import {
   Archive,
   ArrowLeft,
-  ArrowUp,
   BarChart3,
   Check,
   CheckCircle2,
@@ -196,7 +195,6 @@ function App() {
   const [startingSetId, setStartingSetId] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string; piece: string } | null>(null);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
   const setInputRef = useRef<HTMLInputElement>(null);
   const backupInputRef = useRef<HTMLInputElement>(null);
 
@@ -370,13 +368,6 @@ function App() {
     handleMoveAttempt(selectedSquare, square, selectedPieceCode);
   }
 
-  function handleSwipeEnd(event: TouchEvent<HTMLElement>) {
-    if (touchStart === null) return;
-    const distance = (event.changedTouches[0]?.clientY ?? touchStart) - touchStart;
-    setTouchStart(null);
-    if (distance < -55) handleNextAfterError();
-  }
-
   function handleNextAfterError() {
     if (isPersisting || !activeRun || activeRun.currentPuzzle.kind === "playing") return;
     void updateRun(nextAfterPuzzle(activeRun));
@@ -477,7 +468,7 @@ function App() {
     };
 
     return (
-      <main className="solve-main" onTouchStart={(event) => setTouchStart(event.touches[0]?.clientY ?? null)} onTouchEnd={handleSwipeEnd}>
+      <main className="solve-main">
         <div className="solve-topline">
           <button className="back-button" type="button" onClick={() => setView("library")}><ArrowLeft size={17} /> Library</button>
           <div className="solve-set-name"><span>{selectedSet.name}</span><span className="separator">/</span><span>{selectedSet.selection.ratingMin}-{selectedSet.selection.ratingMax}</span></div>
@@ -497,7 +488,6 @@ function App() {
                 <h2>Reset and look again.</h2>
                 <p className="solve-copy">The score is recorded as a failure. You can retry this position as many times as needed.</p>
                 <div className="solve-panel-actions"><button className="primary-button" type="button" onClick={handleRetry}><RotateCcw size={17} /> Retry puzzle</button><button className="secondary-button" type="button" onClick={handleNextAfterError}><SkipForward size={17} /> Next puzzle</button></div>
-                <p className="swipe-hint"><ArrowUp size={14} /> Swipe up on mobile to continue</p>
               </>
             ) : isCompletedAfterError ? (
               <>
@@ -506,7 +496,6 @@ function App() {
                 <h2>Good recovery.</h2>
                 <p className="solve-copy">The position is complete, but this Puzzle Result remains a failure for the Run score.</p>
                 <button className="primary-button" type="button" onClick={handleNextAfterError}><SkipForward size={17} /> Next puzzle</button>
-                <p className="swipe-hint"><ArrowUp size={14} /> Swipe up on mobile to continue</p>
               </>
             ) : (
               <>
