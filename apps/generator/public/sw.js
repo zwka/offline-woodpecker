@@ -47,24 +47,22 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
+function createHeadResponse(response) {
+  return new Response(null, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 async function generatedIndexHeadResponse(url) {
   const request = new Request(url);
   try {
     const cached = await caches.match(request, { ignoreVary: true });
-    if (cached) {
-      return new Response(null, {
-        status: cached.status,
-        statusText: cached.statusText,
-        headers: cached.headers,
-      });
-    }
+    if (cached) return createHeadResponse(cached);
 
     const response = await fetch(request);
-    const headResponse = new Response(null, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
+    const headResponse = createHeadResponse(response);
     if (!response.ok) return headResponse;
     await caches.open(CACHE).then((cache) => cache.put(request, response));
     return headResponse;
@@ -87,11 +85,7 @@ self.addEventListener("fetch", (event) => {
     const fromCache = async () => {
       const cached = await caches.match(cacheRequest, { ignoreVary: true });
       if (!cached || event.request.method !== "HEAD") return cached;
-      return new Response(null, {
-        status: cached.status,
-        statusText: cached.statusText,
-        headers: cached.headers,
-      });
+      return createHeadResponse(cached);
     };
 
     try {
