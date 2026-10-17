@@ -37,6 +37,26 @@ npm run dev:trainer
 
 Open `http://127.0.0.1:4174` in Chrome. The development server is intended for desktop work. Use the production preview below when you need a service worker or Android installation.
 
+## Run production previews
+
+Build both apps:
+
+```bash
+npm run build
+```
+
+Start each production preview in a separate terminal:
+
+```bash
+npm --workspace @offline-woodpecker/generator run preview
+```
+
+```bash
+npm --workspace @offline-woodpecker/trainer run preview
+```
+
+Open the Generator at `http://127.0.0.1:4173` and the Trainer at `http://127.0.0.1:4174`. These previews serve the production builds locally.
+
 ## Build the full puzzle index
 
 The checked-in sample index lets you exercise the UI without the full source database. Build the ignored, compressed index from the Lichess export when you need the complete dataset:
@@ -51,14 +71,7 @@ Keep the source `.zst` export in `puzzles-database/` locally. It is a build inpu
 
 ## Open the Trainer on Android
 
-Run the production build before opening the Trainer on your phone:
-
-```bash
-npm run build
-npm --workspace @offline-woodpecker/trainer run preview
-```
-
-The preview server listens on `http://127.0.0.1:4174`. In a second terminal, start a Cloudflare Quick Tunnel to that exact URL:
+Start the Trainer production preview as described above. In a second terminal, start a Cloudflare Quick Tunnel to that URL:
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:4174
