@@ -47,10 +47,40 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
+async function generatedIndexHeadResponse(url) {
+  const request = new Request(url);
+  try {
+    const cached = await caches.match(request, { ignoreVary: true });
+    if (cached) {
+      return new Response(null, {
+        status: cached.status,
+        statusText: cached.statusText,
+        headers: cached.headers,
+      });
+    }
+
+    const response = await fetch(request);
+    const headResponse = new Response(null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+    if (!response.ok) return headResponse;
+    await caches.open(CACHE).then((cache) => cache.put(request, response));
+    return headResponse;
+  } catch {
+    return new Response("Offline", { status: 503 });
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" && event.request.method !== "HEAD") return;
   if (new URL(event.request.url).origin !== self.location.origin) return;
+  const isGeneratedIndexHead = event.request.method === "HEAD"
+    && new URL(event.request.url).pathname === "/puzzle-index.generated.jsonl.gz";
   event.respondWith((async () => {
+    if (isGeneratedIndexHead) return generatedIndexHeadResponse(event.request.url);
+
     const cacheRequest = event.request.method === "HEAD"
       ? new Request(event.request.url)
       : event.request;

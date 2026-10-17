@@ -110,10 +110,7 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    async function loadManifest() {
-      return loadPuzzleIndex();
-    }
-    loadManifest()
+    loadPuzzleIndex()
       .then(({ manifest: nextManifest, index }) => {
         if (cancelled) return;
         setManifest(nextManifest);

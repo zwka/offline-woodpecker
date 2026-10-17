@@ -24,6 +24,7 @@ function createOfflineIndexLoop() {
     ["/puzzle-index.generated.jsonl.gz", "full puzzle index"],
   ]);
   let online = true;
+  let generatedIndexFailures = 0;
   const absoluteUrl = (request) => new URL(typeof request === "string" ? request : request.url, origin).href;
   const cache = {
     put: async (request, response) => cacheEntries.set(absoluteUrl(request), response.clone()),
@@ -31,6 +32,10 @@ function createOfflineIndexLoop() {
   const networkFetch = async (request, init = {}) => {
     if (!online) throw new TypeError("Failed to fetch");
     const url = new URL(typeof request === "string" ? request : request.url, origin);
+    if (url.pathname === "/puzzle-index.generated.jsonl.gz" && generatedIndexFailures > 0) {
+      generatedIndexFailures -= 1;
+      throw new TypeError("Failed to fetch");
+    }
     const body = assets.get(url.pathname);
     if (body === undefined) return new Response("Not found", { status: 404 });
     return new Response((typeof request === "string" ? init.method : request.method) === "HEAD" ? null : body, { status: 200 });
@@ -79,6 +84,7 @@ function createOfflineIndexLoop() {
   return {
     install,
     loadPuzzleIndex: () => loadPuzzleIndex(controlledFetch),
+    failNextGeneratedIndexFetch: () => { generatedIndexFailures = 1; },
     goOffline: () => { online = false; },
   };
 }
@@ -89,6 +95,16 @@ describe("Generator offline index loading", () => {
     await loop.install();
     await loop.loadPuzzleIndex();
     await loop.loadPuzzleIndex();
+    await loop.loadPuzzleIndex();
+    loop.goOffline();
+
+    await expect(loop.loadPuzzleIndex()).resolves.toMatchObject({ index: "/puzzle-index.generated.jsonl.gz" });
+  });
+
+  it("retries caching on an online open when install-time caching failed", async () => {
+    const loop = createOfflineIndexLoop();
+    loop.failNextGeneratedIndexFetch();
+    await loop.install();
     await loop.loadPuzzleIndex();
     loop.goOffline();
 
