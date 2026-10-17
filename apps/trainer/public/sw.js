@@ -18,7 +18,7 @@ async function cacheAppAssets(cache) {
 }
 
 async function cachedResponseFor(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request, { ignoreVary: true });
   if (cached) return cached;
   if (request.destination === "document") return caches.match("/");
   return undefined;

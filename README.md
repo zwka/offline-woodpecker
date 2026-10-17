@@ -35,7 +35,7 @@ Open `http://127.0.0.1:4173` in Chrome. Start the Trainer in a second terminal:
 npm run dev:trainer
 ```
 
-Open `http://127.0.0.1:4174` in Chrome. Both development servers register a service worker, so after the first online load either app can be reopened offline. Use the production preview below to test the built bundle; mobile installation requires an HTTPS origin.
+Open `http://127.0.0.1:4174` in Chrome. Both development servers register a service worker and reload once after it takes control, so after that first online load either app can be reopened offline. Use the production preview below to test the built bundle; mobile installation requires an HTTPS origin.
 
 ## Run production previews
 
@@ -116,6 +116,6 @@ Check Chrome installability and offline reloads in desktop and Android-style mob
 npm run check:pwa
 ```
 
-This check requires Chrome and `cloudflared`; it starts temporary HTTPS Quick Tunnels for both apps.
+This check requires Chrome and uses loopback origins, which Chrome treats as secure contexts. Installing on an Android phone still requires HTTPS.
 
 See [GLOSSARY.md](GLOSSARY.md) for domain terms, [docs/adr/](docs/adr/) for architecture decisions, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution.

@@ -54,7 +54,7 @@ self.addEventListener("fetch", (event) => {
       ? new Request(event.request.url)
       : event.request;
     const fromCache = async () => {
-      const cached = await caches.match(cacheRequest);
+      const cached = await caches.match(cacheRequest, { ignoreVary: true });
       if (!cached || event.request.method !== "HEAD") return cached;
       return new Response(null, {
         status: cached.status,

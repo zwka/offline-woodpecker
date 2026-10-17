@@ -13,7 +13,7 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc --noEmit",
     "test": "npm run test --workspaces --if-present",
-    "check:pwa": "npm run build && node tools/check-pwa-installability.mjs && node tools/check-pwa-installability.mjs --dev-offline",
+    "check:pwa": "npm run build && node tools/check-pwa-installability.mjs && node tools/check-pwa-installability.mjs --stop-server && node tools/check-pwa-installability.mjs --dev-stop-server",
     "build:index": "node tools/build-puzzle-index.mjs"
   },
   "devDependencies": {

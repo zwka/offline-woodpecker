@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const chromePath = process.env.CHROME_BIN ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const cloudflaredPath = process.env.CLOUDFLARED_BIN ?? "cloudflared";
 const apps = ["generator", "trainer"];
-const runMode = process.argv.includes("--dev-offline") ? "dev" : "preview";
+const runMode = process.argv.includes("--dev-stop-server") ? "dev" : "preview";
+const stopServerOnReload = process.argv.includes("--stop-server") || process.argv.includes("--dev-stop-server");
 
 async function freePort() {
   const server = createServer();
@@ -46,7 +46,6 @@ function stopProcess(child) {
 
 async function startPreview(app) {
   let preview;
-  let tunnel;
   try {
     const port = await freePort();
     const vite = resolve(root, "node_modules/vite/bin/vite.js");
@@ -67,19 +66,9 @@ async function startPreview(app) {
       }
     }, `${app} ${runMode === "dev" ? "development server" : "production preview"}`);
 
-    let tunnelOutput = "";
-    tunnel = spawnTracked(cloudflaredPath, ["tunnel", "--url", localUrl], { stdio: ["ignore", "pipe", "pipe"] });
-    tunnel.stdout.setEncoding("utf8").on("data", (chunk) => { tunnelOutput += chunk; });
-    tunnel.stderr.setEncoding("utf8").on("data", (chunk) => { tunnelOutput += chunk; });
-    const origin = await waitFor(() => {
-      if (tunnel.spawnError) throw tunnel.spawnError;
-      if (tunnel.exitCode !== null) throw new Error(`Cloudflare Quick Tunnel exited with code ${tunnel.exitCode}`);
-      return tunnelOutput.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)?.[0];
-    }, `${app} HTTPS tunnel`);
-
-    return { app, origin, processes: [preview, tunnel] };
+    return { app, origin: localUrl, server: stopServerOnReload ? preview : undefined, processes: [preview] };
   } catch (error) {
-    await Promise.all([preview, tunnel].filter(Boolean).map(stopProcess));
+    await stopProcess(preview);
     throw error;
   }
 }
@@ -98,6 +87,7 @@ async function connectToPage(pageUrl) {
   const socket = new WebSocket(pageUrl);
   const pending = new Map();
   const eventWaiters = new Map();
+  const capturedEvents = [];
   let nextId = 0;
   await new Promise((resolveOpen, reject) => {
     socket.addEventListener("open", resolveOpen, { once: true });
@@ -106,6 +96,7 @@ async function connectToPage(pageUrl) {
   socket.addEventListener("message", ({ data }) => {
     const message = JSON.parse(data);
     if (message.method) {
+      capturedEvents.push({ method: message.method, params: message.params });
       const waiters = eventWaiters.get(message.method) ?? [];
       const waiterIndex = waiters.findIndex(({ predicate }) => predicate(message.params));
       if (waiterIndex >= 0) {
@@ -147,13 +138,17 @@ async function connectToPage(pageUrl) {
         eventWaiters.set(method, waiters);
       });
     },
+    clearEvents() {
+      capturedEvents.length = 0;
+    },
+    getEvents() {
+      return [...capturedEvents];
+    },
     close: () => socket.close(),
   };
 }
 
-async function checkOfflineReload(cdp, origin, app, mode) {
-  await cdp.send("Network.enable");
-  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+async function setDeviceMode(cdp, mode) {
   if (mode === "mobile") {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
       width: 390,
@@ -169,8 +164,89 @@ async function checkOfflineReload(cdp, origin, app, mode) {
     await cdp.send("Emulation.clearDeviceMetricsOverride");
     await cdp.send("Emulation.setUserAgentOverride", { userAgent: "" });
   }
+}
+
+async function inspectOfflineCache(cdp) {
+  const { result } = await cdp.send("Runtime.evaluate", {
+    expression: `(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const scriptUrls = [...document.querySelectorAll("script[src]")].map(script => script.src);
+      const stylesheetUrls = [...document.querySelectorAll('link[rel="stylesheet"][href]')].map(link => link.href);
+      const cacheNames = await caches.keys();
+      const cacheSnapshots = await Promise.all(cacheNames.map(async name => {
+        const cache = await caches.open(name);
+        const requests = await cache.keys();
+        const urls = requests.map(request => request.url);
+        const lookups = await Promise.all([...scriptUrls, ...stylesheetUrls].map(async url => {
+          const byUrl = await cache.match(url);
+          const byRequest = await cache.match(new Request(url));
+          return {
+            url: new URL(url).pathname + new URL(url).search,
+            vary: byUrl?.headers.get("vary") ?? null,
+            byUrl: Boolean(byUrl),
+            byRequest: Boolean(byRequest),
+          };
+        }));
+        return {
+          name,
+          paths: urls.map(url => new URL(url).pathname + new URL(url).search),
+          keyHeaders: requests.map(request => ({
+            path: new URL(request.url).pathname,
+            origin: request.headers.get("origin"),
+            accept: request.headers.get("accept"),
+          })),
+          lookups,
+        };
+      }));
+      return {
+        workerState: registration?.active?.state ?? registration?.installing?.state ?? registration?.waiting?.state ?? "none",
+        controlled: Boolean(navigator.serviceWorker.controller),
+        scriptUrls: scriptUrls.map(url => new URL(url).pathname + new URL(url).search),
+        stylesheetUrls: stylesheetUrls.map(url => new URL(url).pathname + new URL(url).search),
+        cacheSnapshots,
+      };
+    })()`,
+    awaitPromise: true,
+    returnByValue: true,
+  });
+  return result.value;
+}
+
+async function reloadAfterStop(cdp, origin, app, mode) {
+  await setDeviceMode(cdp, mode);
+  const loadEvent = cdp.waitForEvent("Page.loadEventFired");
+  const navigation = await cdp.send("Page.navigate", { url: origin });
+  await loadEvent;
+  const { result } = await cdp.send("Runtime.evaluate", {
+    expression: `({origin: location.origin, href: location.href, title: document.title, readyState: document.readyState, content: document.querySelector("#root")?.innerText.trim() ?? "", rootHtml: document.querySelector("#root")?.innerHTML.slice(0, 300) ?? "", body: document.body?.innerText.slice(0, 300) ?? ""})`,
+    returnByValue: true,
+  });
+  const offlineState = result.value;
+  const renderedOffline = offlineState?.origin === origin && Boolean(offlineState.content);
+  const events = cdp.getEvents();
+  const requestUrls = new Map(events
+    .filter(({ method }) => method === "Network.requestWillBeSent")
+    .map(({ params }) => [params.requestId, new URL(params.request.url).pathname]));
+  const diagnostics = {
+    navigationError: navigation.errorText ?? null,
+    href: offlineState?.href,
+    title: offlineState?.title,
+    readyState: offlineState?.readyState,
+    rootHtml: offlineState?.rootHtml,
+    failedRequests: events.filter(({ method }) => method === "Network.loadingFailed").map(({ params }) => ({ url: requestUrls.get(params.requestId), type: params.type, error: params.errorText, blockedReason: params.blockedReason })),
+    responses: events.filter(({ method, params }) => method === "Network.responseReceived" && (params.type === "Document" || params.type === "Script")).map(({ params }) => ({ url: new URL(params.response.url).pathname, type: params.type, status: params.response.status, fromServiceWorker: params.response.fromServiceWorker })),
+    exceptions: events.filter(({ method }) => method === "Runtime.exceptionThrown").map(({ params }) => params.exceptionDetails.exception?.description ?? params.exceptionDetails.text),
+  };
+  console.log(`${app} ${mode} reload after server stop: ${renderedOffline ? "app rendered from offline cache" : `FAILED; ${JSON.stringify(diagnostics)}`}`);
+  if (!renderedOffline) throw new Error(`${app} ${mode} did not render after the server stopped`);
+}
+
+async function checkOfflineReload(cdp, origin, app, server) {
+  await cdp.send("Network.enable");
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+  await setDeviceMode(cdp, "desktop");
   await cdp.send("Page.navigate", { url: origin });
-  const onlineState = await waitFor(async () => {
+  await waitFor(async () => {
     const { result } = await cdp.send("Runtime.evaluate", {
       expression: `({origin: location.origin, title: document.title, content: document.querySelector("#root")?.innerText.trim() ?? ""})`,
       returnByValue: true,
@@ -178,49 +254,48 @@ async function checkOfflineReload(cdp, origin, app, mode) {
     return result.value?.origin === origin && result.value?.content ? result.value : undefined;
   }, `${app} app to render while online`, 30_000);
 
-  const { result: workerResult } = await cdp.send("Runtime.evaluate", {
-    expression: `Promise.race([navigator.serviceWorker.ready.then(async () => {
-      const deadline = Date.now() + 5000;
-      while (!navigator.serviceWorker.controller && Date.now() < deadline) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-      return Boolean(navigator.serviceWorker.controller);
-    }), new Promise(resolve => setTimeout(() => resolve(false), 6000))])`,
-    awaitPromise: true,
-    returnByValue: true,
-  });
-  const controlled = workerResult.value === true;
+  const controlled = await waitFor(async () => {
+    try {
+      const { result } = await cdp.send("Runtime.evaluate", {
+        expression: "Boolean(navigator.serviceWorker.controller)",
+        returnByValue: true,
+      });
+      return result.value === true ? true : undefined;
+    } catch {
+      return undefined;
+    }
+  }, `${app} service worker control`, 6000).catch(() => false);
+  const controlledDocumentLoaded = runMode === "dev"
+    ? await waitFor(() => {
+      const events = cdp.getEvents();
+      const controlledDocumentIndex = events.findIndex(({ method, params }) => method === "Network.responseReceived"
+        && params.type === "Document"
+        && params.response.fromServiceWorker
+        && new URL(params.response.url).origin === origin);
+      return controlledDocumentIndex >= 0 && events.slice(controlledDocumentIndex + 1).some(({ method }) => method === "Page.loadEventFired");
+    }, `${app} controlled reload`, 5000).catch(() => false)
+    : undefined;
+  const cacheSnapshot = await inspectOfflineCache(cdp);
+  if (controlledDocumentLoaded !== undefined) cacheSnapshot.controlledDocumentLoaded = controlledDocumentLoaded;
+  cacheSnapshot.onlineRequestHeaders = cdp.getEvents()
+    .filter(({ method, params }) => method === "Network.requestWillBeSent" && (params.type === "Script" || params.type === "Stylesheet"))
+    .map(({ params }) => ({
+      url: new URL(params.request.url).pathname + new URL(params.request.url).search,
+      headers: Object.fromEntries(Object.entries(params.request.headers).filter(([name]) => ["accept", "accept-language", "accept-encoding", "origin"].includes(name.toLowerCase()))),
+    }));
 
-  let offlineState;
+  cdp.clearEvents();
+  if (server) await stopProcess(server);
+  console.log(`${app}: server stopped after online render; service worker ${controlled ? "controlled page" : "did not control page"}`);
   try {
-    await cdp.send("Network.emulateNetworkConditions", {
-      offline: true,
-      latency: 0,
-      downloadThroughput: 0,
-      uploadThroughput: 0,
-      connectionType: "none",
-    });
-    const loadEvent = cdp.waitForEvent("Page.loadEventFired");
-    await cdp.send("Page.navigate", { url: origin });
-    await loadEvent;
-    const { result } = await cdp.send("Runtime.evaluate", {
-      expression: `({origin: location.origin, title: document.title, content: document.querySelector("#root")?.innerText.trim() ?? "", body: document.body?.innerText ?? ""})`,
-      returnByValue: true,
-    });
-    offlineState = result.value;
-  } finally {
-    await cdp.send("Network.emulateNetworkConditions", {
-      offline: false,
-      latency: 0,
-      downloadThroughput: -1,
-      uploadThroughput: -1,
-      connectionType: "none",
-    });
+    await reloadAfterStop(cdp, origin, app, "desktop");
+    if (server) await reloadAfterStop(cdp, origin, app, "mobile");
+  } catch (error) {
+    throw new Error(`${error.message}; cache snapshot: ${JSON.stringify(cacheSnapshot)}`);
   }
-
-  const renderedOffline = offlineState?.origin === origin && Boolean(offlineState.content);
-  console.log(`${app} ${mode} offline reload: ${renderedOffline ? "app rendered from offline cache" : `FAILED; ${offlineState?.body?.slice(0, 120) || "app shell did not render"}`}; service worker ${controlled ? "controlled page" : "did not control page"}`);
-  if (!renderedOffline) throw new Error(`${app} ${mode} did not render after Chrome went offline; online page title was ${onlineState.title}`);
+  if (runMode === "dev" && !controlledDocumentLoaded) {
+    throw new Error(`${app} did not reload online under service-worker control before the dev server stopped`);
+  }
 }
 
 async function inspectPage(cdp, origin, mode) {
@@ -297,15 +372,13 @@ try {
   await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
 
-  if (runMode === "dev") {
+  if (stopServerOnReload) {
     const failures = [];
-    for (const mode of ["desktop", "mobile"]) {
-      for (const { app, origin } of previews) {
-        try {
-          await checkOfflineReload(cdp, origin, app, mode);
-        } catch (error) {
-          failures.push(error.message);
-        }
+    for (const { app, origin, server } of previews) {
+      try {
+        await checkOfflineReload(cdp, origin, app, server);
+      } catch (error) {
+        failures.push(error.message);
       }
     }
     if (failures.length) throw new Error(failures.join("\n"));
@@ -315,7 +388,7 @@ try {
         const result = await inspectPage(cdp, origin, mode);
         const errors = result.installabilityErrors.map(({ errorId }) => errorId);
         const label = `${app} ${mode}`;
-        console.log(`${label}: ${errors.length ? `NOT INSTALLABLE (${errors.join(", ")})` : "installability checks passed"}; service worker ${result.controlled ? "controls page" : "does not control page"}; HTTPS origin verified`);
+        console.log(`${label}: ${errors.length ? `NOT INSTALLABLE (${errors.join(", ")})` : "installability checks passed"}; service worker ${result.controlled ? "controls page" : "does not control page"}; secure loopback origin verified`);
         if (!result.manifest) throw new Error(`${label}: Chrome did not load an app manifest`);
         if (!result.controlled) throw new Error(`${label}: service worker did not control the app page`);
         if (errors.length) throw new Error(`${label}: Chrome reports installability errors: ${errors.join(", ")}`);
