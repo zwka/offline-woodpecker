@@ -50,9 +50,9 @@ _Avoid_: Recovered solve, partial success
 ## Applications
 
 **Generator**:
-The Chrome application that filters the local source puzzle index and exports Puzzle Sets for the Trainer.
+The Chrome application that filters the local source puzzle index and exports Puzzle Sets for the Trainer. It runs on desktop and as an Android Chrome PWA.
 _Avoid_: Builder, exporter
 
 **Trainer**:
-The Chrome application that imports Puzzle Sets, runs training Runs, and stores their history locally. It can run as a desktop app or as an Android Chrome PWA.
+The Chrome application that imports Puzzle Sets, runs training Runs, and stores their history locally. It runs on desktop and as an Android Chrome PWA.
 _Avoid_: Solver, player

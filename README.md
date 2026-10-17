@@ -5,7 +5,7 @@ Offline Woodpecker is a pair of Chrome-based offline apps for creating and solvi
 - **Generator**: filter the Lichess puzzle database by rating, themes, and count, then export a self-contained Puzzle Set.
 - **Trainer**: import Puzzle Sets, solve them with first-try scoring, and keep persistent Run history locally.
 
-The Trainer works in Chrome on desktop and Android Chrome. Android installation requires the production preview over HTTPS.
+Both apps work in Chrome on desktop and Android Chrome. Mobile installation requires the production preview over HTTPS.
 
 ## Requirements
 
@@ -13,7 +13,7 @@ The Trainer works in Chrome on desktop and Android Chrome. Android installation 
 - Chrome for desktop development
 - Android Chrome for mobile installation
 - `zstd` when building the full puzzle index
-- `cloudflared` when exposing the Trainer to an Android phone
+- `cloudflared` when exposing either app to an Android phone
 
 ## Run the sample apps
 
@@ -55,7 +55,7 @@ npm --workspace @offline-woodpecker/generator run preview
 npm --workspace @offline-woodpecker/trainer run preview
 ```
 
-Open the Generator at `http://127.0.0.1:4173` and the Trainer at `http://127.0.0.1:4174`. These previews serve the production builds locally.
+Open the Generator at `http://127.0.0.1:4173` and the Trainer at `http://127.0.0.1:4174`. These previews serve the production builds locally and enable the service workers used for offline operation.
 
 ## Build the full puzzle index
 
@@ -69,19 +69,23 @@ Pass the snapshot date that belongs to any replacement source dump. The generate
 
 Keep the source `.zst` export in `puzzles-database/` locally. It is a build input and is not committed because the 293 MB file exceeds GitHub's regular-file limit.
 
-## Open the Trainer on Android
+## Install the apps on Android
 
-Start the Trainer production preview as described above. In a second terminal, start a Cloudflare Quick Tunnel to that URL:
+Start both production previews as described above. Start a Cloudflare Quick Tunnel for each app in separate terminals:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:4173
+```
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:4174
 ```
 
-Open the `https://<name>.trycloudflare.com` URL in Android Chrome. Wait for the library to load while online. The service worker caches the app shell during this first visit. Then install the Trainer from Chrome's menu or add it to the home screen.
+Open each `https://<name>.trycloudflare.com` URL in Android Chrome while online. Wait for Generator to load its puzzle index and Trainer to load its library. Then install each app from Chrome's menu or add it to the home screen. The service workers cache each app shell; Generator also caches its puzzle index, while Trainer stores Puzzle Sets and Run history in browser storage.
 
-After the first load, the service worker serves Trainer from the device cache. You can reopen it and solve locally stored Puzzle Sets without the preview server or tunnel. Trainer stores Puzzle Sets and Run history on the device.
+After the first load, both apps can be reopened from their home-screen icons without the preview server or tunnel. Generator can create Puzzle Sets from its cached index; Trainer can solve locally stored Puzzle Sets and keeps Run history on the device.
 
-To fetch updates or open Trainer on another device, start the preview and tunnel. Then visit the current tunnel URL. A restarted Quick Tunnel gets a new URL and creates a new app origin with separate browser storage. Export a Trainer backup before switching origins. Restore it at the new URL. If port `4174` is busy, choose another preview port and pass the same port to `cloudflared`:
+To fetch updates or open either app on another device, start its preview and tunnel, then visit the current tunnel URL. A restarted Quick Tunnel gets a new URL and creates a new app origin with separate browser storage. Export a Trainer backup before switching origins and restore it at the new URL. If a preview port is busy, choose another port and pass the same port to `cloudflared`:
 
 ```bash
 npm --workspace @offline-woodpecker/trainer run preview -- --port 4184

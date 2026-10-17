@@ -1,5 +1,5 @@
 const CACHE = `woodpecker-generator-v2-${self.registration.scope}`;
-const SHELL = ["/", "/manifest.webmanifest"];
+const SHELL = ["/", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png"];
 const OPTIONAL_FILES = [
   "/puzzle-index.generated-manifest.json",
   "/puzzle-index-manifest.json",
@@ -47,18 +47,32 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  if (event.request.method !== "GET" && event.request.method !== "HEAD") return;
   if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith((async () => {
+    const cacheRequest = event.request.method === "HEAD"
+      ? new Request(event.request.url)
+      : event.request;
+    const fromCache = async () => {
+      const cached = await caches.match(cacheRequest);
+      if (!cached || event.request.method !== "HEAD") return cached;
+      return new Response(null, {
+        status: cached.status,
+        statusText: cached.statusText,
+        headers: cached.headers,
+      });
+    };
+
     try {
       const response = await fetch(event.request);
-      if (response.ok) {
+      if (response.ok && event.request.method === "GET") {
         const copy = response.clone();
         event.waitUntil(caches.open(CACHE).then((cache) => cache.put(event.request, copy)));
       }
+      if (!response.ok) return (await fromCache()) ?? response;
       return response;
     } catch {
-      const cached = await caches.match(event.request);
+      const cached = await fromCache();
       if (cached) return cached;
       if (event.request.destination === "document") return (await caches.match("/")) ?? new Response("Offline", { status: 503 });
       return new Response("Offline", { status: 503 });

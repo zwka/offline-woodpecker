@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+const manifest = JSON.parse(readFileSync(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"));
 const origin = "https://trainer.example";
 
 function createFetchHandler(networkFetch, cacheMatch) {
@@ -37,6 +38,17 @@ function dispatchFetch(handler, request) {
 }
 
 describe("Trainer service worker", () => {
+  it("declares raster icons for Android app surfaces", () => {
+    for (const size of ["192x192", "512x512"]) {
+      expect(manifest.icons).toContainEqual(expect.objectContaining({ sizes: size, type: "image/png" }));
+      const icon = readFileSync(new URL(`../public/icon-${size.split("x")[0]}.png`, import.meta.url));
+      const dimension = Number.parseInt(size, 10);
+      expect(icon.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      expect(icon.readUInt32BE(16)).toBe(dimension);
+      expect(icon.readUInt32BE(20)).toBe(dimension);
+    }
+  });
+
   it("serves the cached app shell when the stopped tunnel returns an HTTP error", async () => {
     const cachedShell = new Response("cached Trainer shell", { status: 200 });
     const handler = createFetchHandler(
