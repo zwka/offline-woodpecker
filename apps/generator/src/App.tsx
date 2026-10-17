@@ -15,12 +15,12 @@ import {
 import {
   createPuzzleSet,
   parsePuzzleJsonl,
-  puzzleIndexManifestSchema,
   selectPuzzlesFromStream,
   type PuzzleIndexManifest,
   type PuzzleSet,
   type PuzzleSetSelection,
 } from "@offline-woodpecker/domain";
+import { loadPuzzleIndex } from "./load-puzzle-index";
 
 type ThemeChoice = "system" | "light" | "dark";
 
@@ -111,18 +111,7 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     async function loadManifest() {
-      const candidates = [
-        { manifest: "/puzzle-index.generated-manifest.json", index: "/puzzle-index.generated.jsonl.gz" },
-        { manifest: "/puzzle-index-manifest.json", index: "/puzzle-index.jsonl" },
-      ];
-      for (const candidate of candidates) {
-        const response = await fetch(candidate.manifest);
-        if (!response.ok) continue;
-        const indexResponse = await fetch(candidate.index, { method: "HEAD" });
-        if (indexResponse.ok) return { manifest: puzzleIndexManifestSchema.parse(await response.json()), index: candidate.index };
-        if (candidate.manifest.includes("generated")) throw new Error("The full local index is not available offline yet. Open Generator online once to warm its cache.");
-      }
-      throw new Error("Puzzle index manifest could not be loaded");
+      return loadPuzzleIndex();
     }
     loadManifest()
       .then(({ manifest: nextManifest, index }) => {
