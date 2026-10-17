@@ -5,7 +5,7 @@ Offline Woodpecker is a pair of Chrome-based offline apps for creating and solvi
 - **Generator**: filter the Lichess puzzle database by rating, themes, and count, then export a self-contained Puzzle Set.
 - **Trainer**: import Puzzle Sets, solve them with first-try scoring, and keep persistent Run history locally.
 
-Both apps work in Chrome on desktop and Android Chrome. Mobile installation requires the production preview over HTTPS.
+Both apps work in Chrome on desktop and Android Chrome. Mobile installation requires a secure HTTPS origin.
 
 ## Requirements
 
@@ -35,7 +35,7 @@ Open `http://127.0.0.1:4173` in Chrome. Start the Trainer in a second terminal:
 npm run dev:trainer
 ```
 
-Open `http://127.0.0.1:4174` in Chrome. The development server is intended for desktop work. Use the production preview below when you need a service worker or Android installation.
+Open `http://127.0.0.1:4174` in Chrome. Both development servers register a service worker, so after the first online load either app can be reopened offline. Use the production preview below to test the built bundle; mobile installation requires an HTTPS origin.
 
 ## Run production previews
 
@@ -109,5 +109,13 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+Check Chrome installability and offline reloads in desktop and Android-style mobile contexts:
+
+```bash
+npm run check:pwa
+```
+
+This check requires Chrome and `cloudflared`; it starts temporary HTTPS Quick Tunnels for both apps.
 
 See [GLOSSARY.md](GLOSSARY.md) for domain terms, [docs/adr/](docs/adr/) for architecture decisions, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution.
