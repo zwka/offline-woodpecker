@@ -118,11 +118,21 @@ Trainer backup export moves Puzzle Sets and Run history between origins or devic
 
 ## Verify changes
 
+Run the workspace checks:
+
 ```bash
 npm run typecheck
 npm test
 npm run build
 ```
+
+For Generator and Trainer browser workflows, use the [verification guide](.claude/skills/verify/SKILL.md). It documents five journeys for export, import, solving a Run, Run history, and library backups. For example, run the Trainer Run journey from the repository root:
+
+```bash
+node .claude/skills/verify/scripts/drive.mjs trainer-run
+```
+
+Each journey uses the checked-in sample index and a fresh Chrome profile. It saves screenshots, action traces, and downloaded files under `.artifacts/verify-woodpecker/`. These journeys do not test the full generated index.
 
 Check Chrome installability and offline reloads in desktop and Android-style mobile contexts:
 

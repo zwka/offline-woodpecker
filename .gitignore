@@ -18,3 +18,4 @@ apps/generator/public/puzzle-index.generated.jsonl.gz
 .local-data/
 playwright-report/
 test-results/
+.artifacts/verify-woodpecker/
