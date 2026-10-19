@@ -1,5 +1,13 @@
 const CACHE = `woodpecker-generator-v2-${self.registration.scope}`;
-const SHELL = ["/", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png"];
+const SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/favicon-32.png",
+  "/apple-touch-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-maskable-512.png",
+];
 const OPTIONAL_FILES = [
   "/puzzle-index.generated-manifest.json",
   "/puzzle-index.generated.jsonl.gz",

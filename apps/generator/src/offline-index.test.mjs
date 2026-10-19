@@ -13,9 +13,11 @@ function createOfflineIndexLoop() {
   const assets = new Map([
     ["/", '<html><link href="/assets/app.css"><script src="/assets/app.js"></script></html>'],
     ["/manifest.webmanifest", "{}"],
-    ["/icon.svg", "<svg></svg>"],
+    ["/favicon-32.png", "icon"],
+    ["/apple-touch-icon.png", "icon"],
     ["/icon-192.png", "icon"],
     ["/icon-512.png", "icon"],
+    ["/icon-maskable-512.png", "icon"],
     ["/assets/app.css", "body {}"],
     ["/assets/app.js", "app"],
     ["/puzzle-index.generated-manifest.json", sampleManifest],

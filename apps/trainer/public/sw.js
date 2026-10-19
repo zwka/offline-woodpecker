@@ -1,5 +1,14 @@
 const CACHE = `woodpecker-trainer-v2-${self.registration.scope}`;
-const SHELL = ["/", "/manifest.webmanifest", "/demo-set.json", "/icon.svg", "/icon-192.png", "/icon-512.png"];
+const SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/demo-set.json",
+  "/favicon-32.png",
+  "/apple-touch-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-maskable-512.png",
+];
 
 async function cacheAppAssets(cache) {
   const shell = await fetch("/");
