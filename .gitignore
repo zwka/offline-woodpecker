@@ -16,6 +16,7 @@ apps/generator/public/puzzle-index.generated.jsonl.gz
 
 # Local browser data and test artifacts.
 .local-data/
+.offline-woodpecker/
 playwright-report/
 test-results/
 .artifacts/verify-woodpecker/

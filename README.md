@@ -85,28 +85,45 @@ These previews serve the production bundles at `http://127.0.0.1:4173` and `http
 
 For a production deployment, open each app's HTTPS origin in Android Chrome while online, wait for its service worker to activate, then install it from Chrome's menu or add it to the home screen.
 
-To test a local production build on Android, start both production previews as described above. Start a Cloudflare Quick Tunnel for each app in separate terminals:
+### Trainer local preview
+
+```bash
+./offline-woodpecker --install-trainer
+```
+
+The launcher supports macOS and Linux. Install `cloudflared` separately. The command checks for it before doing any build work, then runs `npm ci` and builds Trainer. It starts the production preview on `127.0.0.1:4174` and exposes it through a Cloudflare Quick Tunnel.
+
+`npm ci` deletes and recreates the workspace's root `node_modules`. Stop other workspace processes before starting a fresh session. The launcher exits while the preview and tunnel keep running. Session state and per-session logs are stored under `.offline-woodpecker/`. If port `4174` is occupied, startup fails and leaves the existing listener alone.
+
+Open the printed `https://<name>.trycloudflare.com` URL in Android Chrome while online. Wait for Trainer's service worker to activate. Then install the app from Chrome's menu or add it to the home screen. The command does not install the app on the phone. A repeated start reuses the URL when the session is healthy. Stop the preview and tunnel with:
+
+```bash
+./offline-woodpecker --shutdown-trainer
+```
+
+### Generator local preview
+
+To test Generator on Android, build it:
+
+```bash
+npm --workspace @offline-woodpecker/generator run build
+```
+
+Run its production preview in one terminal and a Cloudflare Quick Tunnel in another:
+
+```bash
+npm --workspace @offline-woodpecker/generator run preview
+```
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:4173
 ```
 
-```bash
-cloudflared tunnel --url http://127.0.0.1:4174
-```
-
-Open each `https://<name>.trycloudflare.com` URL in Android Chrome while online. Wait for Generator's service worker to finish caching the index and for Trainer to load its library, then install each app. The HTTPS tunnel provides the secure origin required for service workers and Web Crypto on Android.
+Open the printed tunnel URL in Android Chrome while online. Wait for Generator's service worker to finish caching the index, then install the app from Chrome's menu. The HTTPS tunnel provides the secure origin required for service workers and Web Crypto on Android.
 
 After installation and caching complete, both apps can be reopened from their home-screen icons without the preview server or tunnel. Generator can create Puzzle Sets from its cached index; Trainer can solve locally stored Puzzle Sets and keeps Run history on the device.
 
-To fetch updates, revisit the same HTTPS URL. If a Quick Tunnel restarts, its URL changes and creates a new origin with separate browser caches and Trainer data. Export a Trainer backup before switching origins and restore it at the new URL. If a preview port is busy, choose another port and pass the same port to `cloudflared`:
-
-```bash
-npm --workspace @offline-woodpecker/trainer run preview -- --port 4184
-cloudflared tunnel --url http://127.0.0.1:4184
-```
-
-The Vite preview configuration allows `trycloudflare.com` hosts.
+To fetch updates, revisit the same HTTPS URL. Quick Tunnel URLs are temporary and public to anyone who knows them; a fresh tunnel may have a different origin with separate browser caches and Trainer data. If the origin changes, install Trainer again from the new URL. Export a Trainer backup before switching origins and restore it at the new URL. The Vite preview configuration allows `trycloudflare.com` hosts.
 
 ## Transfer and persistence
 
